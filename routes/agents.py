@@ -6,6 +6,7 @@ import numpy as np
 from streamlit_local_storage import LocalStorage
 from streamlit_js_eval import streamlit_js_eval
 
+from libs.profiles import select_profile
 import libs.scanner as scanner
 
 localS = LocalStorage()
@@ -21,35 +22,20 @@ st.title('Data scanner')
 st.write('___')
 
 is_started = st.session_state.get("started", False)
-
-url_template = st.text_input("Url", query_params.get('url_template') or '', disabled=is_started, key="url_template")
-
-id_regex = r"{{ID:(\d*)}}"
+sites = ["bds.com.vn", "bannha888", "nhadat.cafeland.vn", "nhadat24h.net", "mogi.vn"]
+site_id = st.selectbox(
+    "Site",
+    index=sites.index(query_params.get('site_id') or "bds.com.vn") ,
+    options=sites,
+    disabled=is_started)
+user_id = st.number_input("Id", value=int(query_params.get('id') or 0), disabled=is_started)
 
 def stop():
     query_params.pop('auto_start', None)
     st.session_state.update(started=False)
 
-def get_id(url):
-    match = re.findall(id_regex, url)
-    if match:
-        return match[0]
-    return None
-
-def validate_url(url):
-    if not re.match(r"https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+", url):
-        st.error("Invalid URL")
-        return False
-    id = get_id(url)
-    if not id:
-        st.error("Url must contain {{ID:<number>}}")
-        return False
-    return True
-
-is_valid_url = validate_url(url_template)
-
 if(not is_started):
-    st.button("Start", key="start", disabled=not is_valid_url, on_click=lambda: st.session_state.update(started=True))
+    st.button("Start", key="start", disabled=user_id == 0, on_click=lambda: st.session_state.update(started=True))
 else:
     st.button("Stop", key="stop", on_click=stop)
 
@@ -64,30 +50,29 @@ with placeholder.container():
     d = results_to_df(stored_results)
     df = pd.DataFrame(pd.DataFrame(data=d), columns=['id', 'name', 'mobile'])
     st.table(df)
-    st.button("Clear table", on_click=lambda: localS.setItem("results", []))
+    st.button("Clear table", disabled=is_started, on_click=lambda: localS.setItem("results", []))
 
 if is_started:
     global result
     result = None
 
+    placeholderError = st.empty()
+    retry = 0
     while result is None:
-        id = get_id(url_template)
-        url = re.sub(id_regex, id, url_template)
-
-        scanner_profile = scanner.ScannerProfile()
-        scanner_profile.url = url
-        scanner_profile.fields = {
-            "name": "#content > div:nth-child(6) > div.col-md-8 > div.row > div.col-xs-7 > div > div.col-xs-9 > div.name",
-            "mobile": "#content > div:nth-child(6) > div.col-md-8 > div.row > div.col-xs-5 > div:nth-child(1) > div.col-xs-8"
-        }
-
-        result = scanner.run_scanner(scanner_profile)
-        result.update(id=id)
-        time.sleep(1)
+        scanner_profile = select_profile(site_id, user_id)
+        try:
+            result = scanner.run_scanner(scanner_profile)
+            result.update(id=user_id)
+            continue
+        except Exception as e:
+            with placeholderError.container():
+                st.error(f"(Retry: {retry}) Error: {e}")
+        retry += 1
+        random_sleep = np.random.randint(5, 10)
+        time.sleep(random_sleep)
     
     stored_results.append(result)
     localS.setItem("results", stored_results)
-    next_id = int(id) + 1
-    next_url = url_template.replace(id, str(next_id))
-    st.query_params.update(url_template=next_url, auto_start=True)
+    next_id = int(user_id) + 1
+    st.query_params.update(site_id=site_id, id=next_id, auto_start=True)
     streamlit_js_eval(js_expressions="parent.window.location.reload()")
