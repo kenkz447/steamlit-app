@@ -1,6 +1,7 @@
 pyyaml
 pandas
 numpy
+playwright
 streamlit
 streamlit_authenticator
 streamlit_local_storage
