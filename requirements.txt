@@ -1,0 +1,7 @@
+yaml
+pandas
+numpy
+streamlit
+streamlit_authenticator
+streamlit_local_storage
+streamlit_js_eval
