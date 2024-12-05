@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from streamlit_local_storage import LocalStorage
 from streamlit_js_eval import streamlit_js_eval
+from streamlit.components.v1 import html
 
 from libs.profiles import select_profile
 import libs.scanner as scanner
@@ -29,16 +30,19 @@ site_id = st.selectbox(
     disabled=is_started)
 user_id = st.number_input("Id", value=int(query_params.get('id') or 0), disabled=is_started)
 
+def start():
+    st.session_state.update(started=True)
+
 def stop():
     query_params.pop('auto_start', None)
     st.session_state.update(started=False)
 
 if(not is_started):
-    st.button("Start", key="start", disabled=user_id == 0, on_click=lambda: st.session_state.update(started=True))
+    st.button("Start", key="start", disabled=user_id == 0, on_click=start)
 else:
     st.button("Stop", key="stop", on_click=stop)
 
-stored_results = localS.getItem("results") or []
+stored_results = localS.getItem(site_id) or []
 
 def results_to_df(results):
     return pd.DataFrame(results, columns=['id', 'name', 'mobile'])
@@ -49,7 +53,7 @@ with placeholder.container():
     d = results_to_df(stored_results)
     df = pd.DataFrame(pd.DataFrame(data=d), columns=['id', 'name', 'mobile'])
     st.table(df)
-    st.button("Clear table", disabled=is_started, on_click=lambda: localS.setItem("results", []))
+    st.button("Clear table", disabled=is_started, on_click=lambda: localS.setItem(site_id, []))
 
 if is_started:
     global result
@@ -71,7 +75,7 @@ if is_started:
         time.sleep(random_sleep)
     
     stored_results.append(result)
-    localS.setItem("results", stored_results)
+    localS.setItem(site_id, stored_results)
     next_id = int(user_id) + 1
     st.query_params.update(site_id=site_id, id=next_id, auto_start=True)
     streamlit_js_eval(js_expressions="parent.window.location.reload()")

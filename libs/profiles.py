@@ -16,7 +16,7 @@ class BDSProfile(ScannerProfile):
         except Exception as e:
             raise  Exception("No data found")
 
-    def before_select(self):
+    def before_select(self, page):
         pass
 
 class BanNha888Profile(ScannerProfile):
